@@ -10,10 +10,13 @@
 
 #include "AudioCommon/SoundStream.h"
 
+#ifndef __EMSCRIPTEN__
 #include <cubeb/cubeb.h>
+#endif
 
 class CubebStream final : public SoundStream
 {
+#ifndef __EMSCRIPTEN__
 public:
   ~CubebStream() override;
   bool Init() override;
@@ -31,4 +34,5 @@ private:
   static long DataCallback(cubeb_stream* stream, void* user_data, const void* /*input_buffer*/,
                            void* output_buffer, long num_frames);
   static void StateCallback(cubeb_stream* stream, void* user_data, cubeb_state state);
+#endif
 };

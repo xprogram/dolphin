@@ -11,6 +11,7 @@
 #include "Common/CommonTypes.h"
 #include "Common/StringUtil.h"
 #include "Common/Thread.h"
+#include "Common/VarInt.h"
 
 namespace Common
 {
@@ -45,22 +46,11 @@ void AppendBool(std::string* out, bool v)
   out->push_back(v ? '\xFF' : '\x00');
 }
 
-void AppendVarInt(std::string* out, u64 v)
-{
-  do
-  {
-    u8 current_byte = v & 0x7F;
-    v >>= 7;
-    current_byte |= (!!v) << 7;
-    out->push_back(current_byte);
-  } while (v);
-}
-
 void AppendBytes(std::string* out, const u8* bytes, u32 length, bool encode_length = true)
 {
   if (encode_length)
   {
-    AppendVarInt(out, length);
+    Common::EncodeVarInt(out, length);
   }
   out->append(reinterpret_cast<const char*>(bytes), length);
 }
@@ -100,14 +90,14 @@ void AnalyticsReportBuilder::AppendSerializedValue(std::string* report, bool v)
 void AnalyticsReportBuilder::AppendSerializedValue(std::string* report, u64 v)
 {
   AppendType(report, TypeId::UINT);
-  AppendVarInt(report, v);
+  Common::EncodeVarInt(report, v);
 }
 
 void AnalyticsReportBuilder::AppendSerializedValue(std::string* report, s64 v)
 {
   AppendType(report, TypeId::SINT);
   AppendBool(report, v >= 0);
-  AppendVarInt(report, static_cast<u64>(std::abs(v)));
+  Common::EncodeVarInt(report, static_cast<u64>(std::abs(v)));
 }
 
 void AnalyticsReportBuilder::AppendSerializedValue(std::string* report, u32 v)
@@ -130,9 +120,9 @@ void AnalyticsReportBuilder::AppendSerializedValueVector(std::string* report,
                                                          const std::vector<u32>& v)
 {
   AppendType(report, TypeId::UINT | TypeId::ARRAY);
-  AppendVarInt(report, v.size());
+  Common::EncodeVarInt(report, v.size());
   for (u32 x : v)
-    AppendVarInt(report, x);
+    Common::EncodeVarInt(report, x);
 }
 
 AnalyticsReporter::AnalyticsReporter()

@@ -8,6 +8,15 @@
 
 #include "Common/CommonTypes.h"
 
+// Use system headers for Emscripten to be able to
+// link statically to GL functions, giving less
+// overhead, and custom headers for anybody else.
+#ifdef __EMSCRIPTEN__
+#include "Common/GL/GLExtensions/gl_emscripten.h"
+// When this define is set, GL functions are NOT pointers and
+// cannot be set to alias alternative functions
+#define STATIC_GL_API
+#else
 #include "Common/GL/GLExtensions/AMD_pinned_memory.h"
 #include "Common/GL/GLExtensions/ARB_ES2_compatibility.h"
 #include "Common/GL/GLExtensions/ARB_ES3_compatibility.h"
@@ -55,6 +64,7 @@
 #include "Common/GL/GLExtensions/gl_4_3.h"
 #include "Common/GL/GLExtensions/gl_4_4.h"
 #include "Common/GL/GLExtensions/gl_4_5.h"
+#endif  // __EMSCRIPTEN__
 
 class GLContext;
 

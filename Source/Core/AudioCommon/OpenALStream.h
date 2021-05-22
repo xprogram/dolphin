@@ -4,18 +4,24 @@
 
 #pragma once
 
+#include <array>
 #include <thread>
+#include <vector>
+
+#if defined(_WIN32)
+#include <al.h>
+#include <alc.h>
+#include <alext.h>
+#elif defined(__EMSCRIPTEN__)
+#include <AL/al.h>
+#include <AL/alc.h>
+#endif
 
 #include "AudioCommon/SoundStream.h"
 #include "Common/Event.h"
 #include "Core/Core.h"
 #include "Core/HW/AudioInterface.h"
 #include "Core/HW/SystemTimers.h"
-
-#ifdef _WIN32
-#include <al.h>
-#include <alc.h>
-#include <alext.h>
 
 // OpenAL requires a minimum of two buffers, three or more recommended
 #define OAL_BUFFERS 3
@@ -29,7 +35,6 @@
 #define FRAME_SURROUND_FLOAT SURROUND_CHANNELS* SIZE_FLOAT
 #define FRAME_SURROUND_SHORT SURROUND_CHANNELS* SIZE_SHORT
 #define FRAME_SURROUND_INT32 SURROUND_CHANNELS* SIZE_INT32
-#endif  // _WIN32
 
 // From AL_EXT_float32
 #ifndef AL_FORMAT_STEREO_FLOAT32
@@ -52,7 +57,7 @@
 
 class OpenALStream final : public SoundStream
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
 public:
   OpenALStream() : m_source(0) {}
   ~OpenALStream() override;
@@ -75,5 +80,5 @@ private:
   ALuint m_source;
   ALfloat m_volume;
 
-#endif  // _WIN32
+#endif  // defined(_WIN32) || defined(__EMSCRIPTEN__)
 };

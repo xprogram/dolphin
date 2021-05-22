@@ -65,6 +65,11 @@ struct CPUInfo
   bool bSHA1 = false;
   bool bSHA2 = false;
 
+  // Wasm specific
+  bool bBulkMem = false;
+  bool bFWSIMD = false;
+  bool bTailCall = false;
+
   // Call Detect()
   explicit CPUInfo();
 

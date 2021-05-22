@@ -37,7 +37,13 @@ typedef struct pollfd pollfd_t;
 #else
 #include <errno.h>
 #include <netinet/in.h>
+#ifdef __EMSCRIPTEN__
+#include <fcntl.h>
+#include <poll.h>
+using pollfd_t = pollfd;
+#else
 #include <sys/fcntl.h>
+#endif
 #include <sys/socket.h>
 #include <sys/types.h>
 #endif

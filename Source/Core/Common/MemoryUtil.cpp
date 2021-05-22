@@ -23,6 +23,8 @@
 #include <sys/sysctl.h>
 #elif defined __HAIKU__
 #include <OS.h>
+#elif defined __EMSCRIPTEN__
+#include <emscripten/heap.h>
 #else
 #include <sys/sysinfo.h>
 #endif
@@ -174,6 +176,10 @@ size_t MemPhysical()
   system_info sysinfo;
   get_system_info(&sysinfo);
   return static_cast<size_t>(sysinfo.max_pages * B_PAGE_SIZE);
+#elif defined __EMSCRIPTEN__
+  // Retrieve length of the program's heap buffer and not the
+  // available memory of its encompassing environment
+  return emscripten_get_heap_size();
 #else
   struct sysinfo memInfo;
   sysinfo(&memInfo);

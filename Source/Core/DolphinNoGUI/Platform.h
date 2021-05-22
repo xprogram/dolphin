@@ -31,6 +31,9 @@ public:
   // Request an immediate shutdown.
   void Stop();
 
+#ifdef __EMSCRIPTEN__
+  static std::unique_ptr<Platform> CreateWebPlatform(bool headless);
+#else
   static std::unique_ptr<Platform> CreateHeadlessPlatform();
 #ifdef HAVE_X11
   static std::unique_ptr<Platform> CreateX11Platform();
@@ -43,6 +46,7 @@ public:
 #ifdef _WIN32
   static std::unique_ptr<Platform> CreateWin32Platform();
 #endif
+#endif  // __EMSCRIPTEN__
 
 protected:
   void UpdateRunningFlag();

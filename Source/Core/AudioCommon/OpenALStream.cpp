@@ -2,9 +2,12 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
+
 #include <climits>
 #include <cstring>
 #include <thread>
@@ -15,7 +18,9 @@
 #include "Common/Thread.h"
 #include "Core/ConfigManager.h"
 
+#ifdef _WIN32
 static HMODULE s_openal_dll = nullptr;
+#endif
 
 #define OPENAL_API_VISIT(X)                                                                        \
   X(alBufferData)                                                                                  \
@@ -43,6 +48,7 @@ static HMODULE s_openal_dll = nullptr;
   X(alSourceStop)                                                                                  \
   X(alSourceUnqueueBuffers)
 
+#ifdef _WIN32
 // Create func_t function pointer type and declare a nullptr-initialized static variable of that
 // type named "pfunc".
 #define DYN_FUNC_DECLARE(func)                                                                     \
@@ -56,9 +62,15 @@ static HMODULE s_openal_dll = nullptr;
   {                                                                                                \
     return false;                                                                                  \
   }
+#else
+// We just need to declare aliases to the API functions because
+// there's no need to dynamically load OpenAL
+#define DYN_FUNC_DECLARE(func) [[maybe_unused]] static constexpr auto& p##func = func;
+#endif  // __EMSCRIPTEN__
 
 OPENAL_API_VISIT(DYN_FUNC_DECLARE);
 
+#ifdef _WIN32
 static bool InitFunctions()
 {
   OPENAL_API_VISIT(OPENAL_FUNC_LOAD);
@@ -88,17 +100,29 @@ bool OpenALStream::isValid()
 {
   return InitLibrary();
 }
+#else
+bool OpenALStream::isValid()
+{
+  // When OpenAL is statically linked, it is
+  // valid the second the program begins
+  return true;
+}
+#endif  // _WIN32
 
 //
 // AyuanX: Spec says OpenAL1.1 is thread safe already
 //
 bool OpenALStream::Init()
 {
+  // Emscripten: extension not present, hence will always fail
+  // even though skipping this check everything works
+#ifndef __EMSCRIPTEN__
   if (!palcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT"))
   {
     PanicAlertFmtT("OpenAL: can't find sound devices");
     return false;
   }
+#endif
 
   const char* default_device_dame = palcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER);
   INFO_LOG_FMT(AUDIO, "Found OpenAL device {}", default_device_dame);
@@ -384,4 +408,4 @@ void OpenALStream::SoundLoop()
   }
 }
 
-#endif  // _WIN32
+#endif  // defined(_WIN32) || defined(__EMSCRIPTEN__)

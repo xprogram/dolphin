@@ -121,6 +121,7 @@ static void APIENTRY ErrorCallback(GLenum source, GLenum type, GLuint id, GLenum
   }
 }
 
+#ifndef STATIC_GL_API
 // Two small Fallbacks to avoid GL_ARB_ES2_compatibility
 static void APIENTRY DepthRangef(GLfloat neardepth, GLfloat fardepth)
 {
@@ -130,6 +131,7 @@ static void APIENTRY ClearDepthf(GLfloat depthval)
 {
   glClearDepth(depthval);
 }
+#endif
 
 static void InitDriverInfo()
 {
@@ -404,7 +406,8 @@ Renderer::Renderer(std::unique_ptr<GLContext> main_gl_context, float backbuffer_
       bSuccess = false;
     }
 
-    // OpenGL 3 doesn't provide GLES like float functions for depth.
+#ifndef STATIC_GL_API
+    // OpenGL 3 doesn't provide GLES-like float functions for depth.
     // They are in core in OpenGL 4.1, so almost every driver should support them.
     // But for the oldest ones, we provide fallbacks to the old double functions.
     if (!GLExtensions::Supports("GL_ARB_ES2_compatibility"))
@@ -412,6 +415,7 @@ Renderer::Renderer(std::unique_ptr<GLContext> main_gl_context, float backbuffer_
       glDepthRangef = DepthRangef;
       glClearDepthf = ClearDepthf;
     }
+#endif
   }
 
   // Copy the GPU name to g_Config, so Analytics can see it.
@@ -487,17 +491,14 @@ Renderer::Renderer(std::unique_ptr<GLContext> main_gl_context, float backbuffer_
 
   if (m_main_gl_context->IsGLES())
   {
-    g_ogl_config.SupportedESPointSize =
-        GLExtensions::Supports("GL_OES_geometry_point_size") ?
-            1 :
-            GLExtensions::Supports("GL_EXT_geometry_point_size") ? 2 : 0;
-    g_ogl_config.SupportedESTextureBuffer = GLExtensions::Supports("VERSION_GLES_3_2") ?
-                                                EsTexbufType::TexbufCore :
-                                                GLExtensions::Supports("GL_OES_texture_buffer") ?
-                                                EsTexbufType::TexbufOes :
-                                                GLExtensions::Supports("GL_EXT_texture_buffer") ?
-                                                EsTexbufType::TexbufExt :
-                                                EsTexbufType::TexbufNone;
+    g_ogl_config.SupportedESPointSize = GLExtensions::Supports("GL_OES_geometry_point_size") ? 1 :
+                                        GLExtensions::Supports("GL_EXT_geometry_point_size") ? 2 :
+                                                                                               0;
+    g_ogl_config.SupportedESTextureBuffer =
+        GLExtensions::Supports("VERSION_GLES_3_2")      ? EsTexbufType::TexbufCore :
+        GLExtensions::Supports("GL_OES_texture_buffer") ? EsTexbufType::TexbufOes :
+        GLExtensions::Supports("GL_EXT_texture_buffer") ? EsTexbufType::TexbufExt :
+                                                          EsTexbufType::TexbufNone;
 
     supports_glsl_cache = true;
     g_ogl_config.bSupportsGLSync = true;

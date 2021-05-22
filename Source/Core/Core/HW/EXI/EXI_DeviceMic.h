@@ -17,6 +17,9 @@ namespace ExpansionInterface
 class CEXIMic : public IEXIDevice
 {
 public:
+#ifdef __EMSCRIPTEN__
+  CEXIMic(const int index) {}
+#else
   CEXIMic(const int index);
   virtual ~CEXIMic();
   void SetCS(int cs) override;
@@ -100,5 +103,6 @@ private:
   int stream_wpos;
   int stream_rpos;
   int samples_avail;
+#endif  // __EMSCRIPTEN__
 };
 }  // namespace ExpansionInterface

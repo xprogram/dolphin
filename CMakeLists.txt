@@ -21,10 +21,10 @@ set(DISTRIBUTOR "None" CACHE STRING "Name of the distributor.")
 
 set(DOLPHIN_DEFAULT_UPDATE_TRACK "" CACHE STRING "Name of the default update track. If empty, disables auto-update.")
 
-if(UNIX AND NOT APPLE AND NOT ANDROID)
+if(UNIX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN)
   option(ENABLE_X11 "Enables X11 Support" ON)
 endif()
-if(NOT WIN32 AND NOT APPLE AND NOT HAIKU)
+if(NOT WIN32 AND NOT APPLE AND NOT HAIKU AND NOT EMSCRIPTEN)
   option(ENABLE_EGL "Enables EGL OpenGL Interface" ON)
 endif()
 
@@ -41,6 +41,11 @@ option(ENABLE_LLVM "Enables LLVM support, for disassembly" ON)
 option(ENABLE_TESTS "Enables building the unit tests" ON)
 option(ENABLE_VULKAN "Enables vulkan video backend" ON)
 option(USE_DISCORD_PRESENCE "Enables Discord Rich Presence, show the current game on Discord" ON)
+option(USE_COMPILER_PORTS "Prioritize the built-in compiler ports of certain libraries, such as libpng, over the ones in the source tree" ON)
+
+if(EMSCRIPTEN)
+  option(ENABLE_HUGE_HEAP "Enable for a program heap expandable up to 4GB, instead of only 2GB" OFF)
+endif()
 
 # Maintainers: if you consider blanket disabling this for your users, please
 # consider the following points:
@@ -60,8 +65,8 @@ option(OPROFILING "Enable profiling" OFF)
 # TODO: Add DSPSpy
 option(DSPTOOL "Build dsptool" OFF)
 
-# Enable SDL for default on operating systems that aren't Android, Linux or Windows.
-if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT MSVC)
+# Enable SDL for default on operating systems that aren't Android, Emscripten, Linux or Windows.
+if(NOT ANDROID AND NOT EMSCRIPTEN AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT MSVC)
   option(ENABLE_SDL "Enables SDL as a generic controller backend" ON)
 else()
   option(ENABLE_SDL "Enables SDL as a generic controller backend" OFF)
@@ -80,7 +85,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   endif()
 endif()
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
   # Builds a relocatable binary on Linux.
   # The Sys folder will need to be copied to the Binaries folder.
   option(LINUX_LOCAL_DEV "Enable relocatable binary" OFF)
@@ -95,6 +100,7 @@ include(CheckAndAddFlag)
 include(CheckCCompilerFlag)
 include(CheckVendoringApproved)
 include(DolphinCompileDefinitions)
+include(EmscriptenLibraryLinking)
 
 # Enable folders for IDE
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -103,7 +109,12 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(bindir  ${CMAKE_INSTALL_PREFIX}/bin               CACHE PATH "bindir")
 set(datadir ${CMAKE_INSTALL_PREFIX}/share/dolphin-emu CACHE PATH "datadir")
 set(mandir  ${CMAKE_INSTALL_PREFIX}/share/man         CACHE PATH "mandir")
-add_definitions(-DDATA_DIR="${datadir}/")
+
+if(EMSCRIPTEN)
+  add_definitions(-DDATA_DIR="/dat/")
+else()
+  add_definitions(-DDATA_DIR="${datadir}/")
+endif()
 
 if(CMAKE_SYSROOT)
   # If we should use a sysroot, tell pkg-config to search for packages in there, not on the host
@@ -187,7 +198,7 @@ message(STATUS "Detected architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 
 # Detect 64bit or 32bit
 # CMake doesn't provide a simple way to determine 32bit or 64bit
-# If we ever support a architecture that is 64bit with 32bit pointers then this'll break
+# If we ever support an architecture that is 64bit with 32bit pointers then this'll break
 # Of course the chances of that are slim(x32?) so who cares
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(_ARCH_64 1)
@@ -212,12 +223,22 @@ elseif(_ARCH_64 AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
   add_definitions(-D_M_ARM_64=1)
   # CRC instruction set is used in the CRC32 hash function
   check_and_add_flag(HAVE_ARCH_ARMV8 -march=armv8-a+crc)
+elseif(EMSCRIPTEN)
+  # Note: _M_WASM implies EMSCRIPTEN for now, but both should be used in
+  # their respective situations (i.e. _M_WASM for architecture-related paths)
+  set(_M_WASM 1)
+  add_definitions(-D_M_WASM=1)
 else()
   message(FATAL_ERROR "You're building on an unsupported platform: "
       "'${CMAKE_SYSTEM_PROCESSOR}' with ${CMAKE_SIZEOF_VOID_P}-byte pointers."
       " Enable generic build if you really want a JIT-less binary.")
 endif()
 
+
+# Enforce minimum Emscripten version
+if(EMSCRIPTEN AND EMSCRIPTEN_VERSION VERSION_LESS 2.0.17)
+  message(FATAL_ERROR "Dolphin requires at least Emscripten 2.0.17 (found ${EMSCRIPTEN_VERSION})")
+endif()
 
 # Enforce minimum GCC version
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
@@ -277,7 +298,9 @@ else()
   check_and_add_flag(FOMIT_FRAME_POINTER -fomit-frame-pointer RELEASE_ONLY)
 
   dolphin_compile_definitions(_DEBUG DEBUG_ONLY)
-  check_and_add_flag(GGDB -ggdb DEBUG_ONLY)
+  if(NOT EMSCRIPTEN)
+    check_and_add_flag(GGDB -ggdb DEBUG_ONLY)
+  endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # GNU ar: Create thin archive files.
@@ -287,6 +310,69 @@ else()
     set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> qcTP <TARGET> <LINK_FLAGS> <OBJECTS>")
     set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> qTP  <TARGET> <LINK_FLAGS> <OBJECTS>")
   endif()
+endif()
+
+if(EMSCRIPTEN)
+  # There is a small code size reduction when
+  # not using RTTI; might as well go for it
+  check_and_add_flag(NO_RTTI -fno-rtti)
+
+  # Use only forward-compatible options and avoid
+  # auto-linking all the system libraries
+  add_compile_options(-sSTRICT)
+  link_libraries(-sSTRICT)
+
+  # Prevent usage of emscripten_run_script and eval in
+  # general since we want to be secure and performant
+  link_libraries(-sNO_DYNAMIC_EXECUTION)
+
+  # Starting heap size. It seems that browsers disallow
+  # any contiguous allocation bigger than 1GB and
+  # have recently introduced an even lower limit, so
+  # we cannot really preallocate any further than this.
+  link_libraries(-sINITIAL_MEMORY=512MB)
+  
+  # Encapsulate the output into a factory method that can create program instances
+  link_libraries(-sMODULARIZE)
+
+  if(ENABLE_GENERIC)
+    # This build fails with an assert despite https://github.com/emscripten-core/emscripten/pull/11505
+    # Something about 64-bit atomic loads not being implemented...
+    message(STATUS "Targeting the web via Emscripten's JavaScript backend")
+    add_compile_options(-sNO_WASM)
+    link_libraries(-sNO_WASM)
+  else()
+    message(STATUS "Targeting the web via Emscripten's WebAssembly backend")
+  endif()
+
+  # Nothing is done for a resizable heap right here (only the message is displayed
+  # here so that people understand what is going on), as flags set here
+  # also carry into tests, where a dynamic heap of that kind is unnecessary
+  message(STATUS "Using a growing heap buffer for the web")
+
+  if(ENABLE_HUGE_HEAP)
+    message(STATUS "Setting maximum memory to 4GB for a huge heap")
+    link_libraries(-sMAXIMUM_MEMORY=4GB)
+  else()
+    message(STATUS "Setting maximum memory to 2GB")
+    link_libraries(-sMAXIMUM_MEMORY=2GB)
+  endif()
+
+  # Define a Sys folder packaging library so that any executable
+  # can link to it to load those files into Emscripten's memory-backed
+  # virtual filesystem
+  add_library(lz4sysdir INTERFACE)
+  target_link_libraries(lz4sysdir INTERFACE "--preload-file \"${CMAKE_SOURCE_DIR}/Data/Sys@/dat/sys\"")
+
+  # Compress any file packaged with the executable
+  # to save space, but make the packaged files read-only.
+  # Not an issue here, since Dolphin only needs to read
+  # from its Sys folder, which is the only thing
+  # currently packaged. But this cannot be tuned per
+  # file packaging operation without additional
+  # parameters, so if Dolphin ever writes to a
+  # packaged file this needs to be carefully revised.
+  target_link_libraries(lz4sysdir INTERFACE -sLZ4)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -360,7 +446,23 @@ if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|NetBSD")
 endif()
 
 # Dolphin requires threads.
-find_package(Threads)
+find_package(Threads REQUIRED)
+if(EMSCRIPTEN)
+  # This compiler needs it explicitly specified, otherwise we
+  # will link to a stub pthread implementation.
+  add_compile_options(-sUSE_PTHREADS)
+  link_libraries(-sUSE_PTHREADS)
+  
+  # Silence a link-time warning describing limitations
+  # of the pthread + memory growth combination
+  link_libraries(-Wno-pthreads-mem-growth)
+
+  # The application should try not to exceed this many
+  # threads at once, otherwise it might hang waiting
+  # for the pool to have a worker available when
+  # attempting to spawn a new thread
+  link_libraries(-sPTHREAD_POOL_SIZE=8)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING
@@ -377,6 +479,18 @@ endif()
 
 if(FASTLOG)
   add_definitions(-DDEBUGFAST)
+endif()
+
+if(EMSCRIPTEN)
+  message(STATUS "Building for Emscripten, forcibly disabling unsupported features")
+  set(USE_DISCORD_PRESENCE OFF)
+  set(USE_UPNP OFF)
+  set(GDBSTUB OFF)
+  set(ENABLE_ALSA OFF)
+  set(ENABLE_PULSEAUDIO OFF)
+  set(ENABLE_VULKAN OFF)
+  # TODO re-enable someday
+  set(ENABLE_QT OFF)
 endif()
 
 if(GDBSTUB)
@@ -449,6 +563,24 @@ if (OPENGL_GL)
   include_directories(${OPENGL_INCLUDE_DIR})
 endif()
 
+if(EMSCRIPTEN)
+  add_library(webgl2gles INTERFACE)
+  target_link_libraries(webgl2gles INTERFACE
+    
+    # Optimize code space by removing temporary buffers only needed if targeting WebGL 1
+    -sNO_GL_POOL_TEMP_BUFFERS
+
+    # Enable GL proxying, so that a context can be used on any thread
+    -sOFFSCREEN_FRAMEBUFFER
+
+    # Emulate OpenGL ES 3 as closely as possible (through WebGL 2)
+    -sFULL_ES3
+
+    gl-mt-webgl2-ofb-full_es3
+    
+    GL)
+endif()
+
 if(ENABLE_X11)
   find_package(X11)
   if(X11_FOUND)
@@ -509,7 +641,7 @@ if(ENABLE_EVDEV)
   endif()
 endif()
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
   message(STATUS "Using named pipes as controller inputs")
   add_definitions(-DUSE_PIPES=1)
   message(STATUS "Watching game memory for changes")
@@ -650,6 +782,12 @@ endif()
 find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Using shared zlib")
+elseif(USE_COMPILER_PORTS AND EMSCRIPTEN)
+  message(STATUS "Using built-in zlib from Emscripten")
+  add_library(z INTERFACE)
+  target_compile_options(z INTERFACE -sUSE_ZLIB)
+  target_link_libraries(z INTERFACE -sUSE_ZLIB)
+  add_library(ZLIB::ZLIB ALIAS z)
 else()
   check_vendoring_approved(zlib)
   message(STATUS "Shared zlib not found, falling back to the static library")
@@ -684,6 +822,12 @@ if(NOT APPLE)
 endif()
 if (PNG_FOUND)
   message(STATUS "Using shared libpng")
+elseif(OFF) #(USE_COMPILER_PORTS AND EMSCRIPTEN) doesn't work as the compiler's version is not good
+  message(STATUS "Using built-in libpng from Emscripten")
+  add_library(png INTERFACE)
+  target_compile_options(png INTERFACE -sUSE_LIBPNG)
+  target_link_libraries(png INTERFACE -sUSE_LIBPNG)
+  set(PNG png)
 else()
   check_vendoring_approved(libpng)
   message(STATUS "Using static libpng from Externals")
@@ -707,16 +851,20 @@ endif()
 add_subdirectory(Externals/soundtouch)
 include_directories(Externals/soundtouch)
 
-find_package(CUBEB)
+if(NOT EMSCRIPTEN)
+  find_package(CUBEB)
+endif()
 if(CUBEB_FOUND)
   message(STATUS "Using the system cubeb")
+elseif(EMSCRIPTEN)
+  message(STATUS "Using Emscripten's OpenAL implementation instead of cubeb")
 else()
   check_vendoring_approved(cubeb)
   message(STATUS "Using static cubeb from Externals")
   add_subdirectory(Externals/cubeb EXCLUDE_FROM_ALL)
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT EMSCRIPTEN) # TODO check out webusb-libusb wrappers
   add_definitions(-D__LIBUSB__)
   if(NOT APPLE)
     find_package(LibUSB)
@@ -775,10 +923,14 @@ else()
   include_directories(Externals/mbedtls/include)
 endif()
 
-find_package(CURL)
+if(NOT EMSCRIPTEN)
+  find_package(CURL)
+endif()
 if(CURL_FOUND)
   message(STATUS "Using shared libcurl")
   include_directories(${CURL_INCLUDE_DIRS})
+elseif(EMSCRIPTEN)
+  message(STATUS "Using custom HTTP backend for Emscripten")
 else()
   check_vendoring_approved(curl)
   message(STATUS "Using static libcurl from Externals")
@@ -802,7 +954,7 @@ else()
   set(ICONV_LIBRARIES iconv)
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT EMSCRIPTEN)
   find_package(HIDAPI)
   if(NOT HIDAPI_FOUND)
     check_vendoring_approved(hidapi)

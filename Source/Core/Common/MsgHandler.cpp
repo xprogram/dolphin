@@ -18,6 +18,9 @@
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
 #include "Common/StringUtil.h"
+#ifdef __EMSCRIPTEN__
+#include "Common/WebAdapter.h"
+#endif
 
 namespace Common
 {
@@ -26,7 +29,7 @@ namespace
 // Default non library dependent panic alert
 bool DefaultMsgHandler(const char* caption, const char* text, bool yes_no, MsgType style)
 {
-#ifdef _WIN32
+#if defined(_WIN32)
   int window_style = MB_ICONINFORMATION;
   if (style == MsgType::Question)
     window_style = MB_ICONQUESTION;
@@ -35,6 +38,11 @@ bool DefaultMsgHandler(const char* caption, const char* text, bool yes_no, MsgTy
 
   return IDYES == MessageBox(0, UTF8ToTStr(text).c_str(), UTF8ToTStr(caption).c_str(),
                              window_style | (yes_no ? MB_YESNO : MB_OK));
+#elif defined(__EMSCRIPTEN__)
+  std::string full_msg = "[" + std::string(caption) + "]\n\n";
+  full_msg += text;
+
+  return WebAdapter_DisplayAlert(full_msg.c_str(), yes_no);
 #else
   fmt::print(stderr, "{}\n", text);
 
@@ -55,10 +63,10 @@ bool s_alert_enabled = true;
 
 const char* GetCaption(MsgType style)
 {
-  static const std::string info_caption = s_str_translator(_trans("Information"));
-  static const std::string warn_caption = s_str_translator(_trans("Question"));
-  static const std::string ques_caption = s_str_translator(_trans("Warning"));
-  static const std::string crit_caption = s_str_translator(_trans("Critical"));
+  static const std::string info_caption = GetStringT("Information");
+  static const std::string ques_caption = GetStringT("Question");
+  static const std::string warn_caption = GetStringT("Warning");
+  static const std::string crit_caption = GetStringT("Critical");
 
   switch (style)
   {

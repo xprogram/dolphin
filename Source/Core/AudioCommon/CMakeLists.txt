@@ -3,10 +3,6 @@ add_library(audiocommon
   AudioCommon.h
   AudioStretcher.cpp
   AudioStretcher.h
-  CubebStream.cpp
-  CubebStream.h
-  CubebUtils.cpp
-  CubebUtils.h
   Enums.h
   Mixer.cpp
   Mixer.h
@@ -17,6 +13,14 @@ add_library(audiocommon
   WaveFile.cpp
   WaveFile.h
 )
+
+# Cubeb is just too much work to try and port to Emscripten right now, and
+# it's way easier to just switch to OpenAL which is already well supported.
+if(EMSCRIPTEN)
+  target_sources(audiocommon PRIVATE OpenALStream.cpp OpenALStream.h)
+else()
+  target_sources(audiocommon PRIVATE CubebStream.cpp CubebStream.h CubebUtils.cpp CubebUtils.h)
+endif()
 
 find_package(OpenSLES)
 if(OPENSLES_FOUND)
@@ -75,11 +79,16 @@ if(WIN32)
   )
 endif()
 
+if(EMSCRIPTEN)
+  target_link_libraries(audiocommon PRIVATE openal)
+else()
+  target_link_libraries(audiocommon PRIVATE cubeb)
+endif()
+
 target_link_libraries(audiocommon
 PUBLIC
   common
 
 PRIVATE
-  cubeb
   SoundTouch
   FreeSurround)

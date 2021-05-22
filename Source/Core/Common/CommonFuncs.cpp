@@ -14,6 +14,19 @@
 #define strerror_r(err, buf, len) strerror_s(buf, len, err)
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
+#include <fmt/format.h>
+#include <unzip.h>
+
+#include "Common/CommonPaths.h"
+#include "Common/FileUtil.h"
+#include "Common/IOFile.h"
+#include "Common/ScopeGuard.h"
+#include "Common/StringUtil.h"
+#endif
+
 constexpr size_t BUFFER_SIZE = 256;
 
 // Wrapper function to get last strerror(errno) string.
@@ -26,8 +39,8 @@ std::string LastStrerrorString()
   // buffer and returns an int (0 on success). The GNU version returns a pointer to the message,
   // which might have been stored in the passed-in buffer or might be a static string.
 
-  // We check defines in order to figure out variant is in use, and we store the returned value
-  // to a variable so that we'll get a compile-time check that our assumption was correct.
+  // We check defines in order to figure out which variant is in use, and we store the returned
+  // value to a variable so that we'll get a compile-time check that our assumption was correct.
 
 #if (defined(__GLIBC__) || __ANDROID_API__ >= 23) &&                                               \
     (_GNU_SOURCE || (_POSIX_C_SOURCE < 200112L && _XOPEN_SOURCE < 600))
@@ -74,3 +87,103 @@ std::optional<std::wstring> GetModuleName(void* hInstance)
   return name;
 }
 #endif
+
+#ifdef __EMSCRIPTEN__
+#define RETURN_FAILURE(msg, ...)                                                                   \
+  do                                                                                               \
+  {                                                                                                \
+    emscripten_console_error(fmt::format(msg, ##__VA_ARGS__).c_str());                             \
+    return -1;                                                                                     \
+  } while (0)
+
+/// Unpack an zip file on the filsystem into a specified directory.
+/// Called from the web environment wrapping code to decompress the user
+/// directory to the application's filesystem prior to boot.
+///
+/// If the operation failed to complete, files
+/// that were already extracted remain on the
+/// filesystem.
+///
+/// Returns 0 on success, -1 on failure.
+extern "C" EMSCRIPTEN_KEEPALIVE int Dolphin_UnpackZip(const char* zip_path, const char* out_dir)
+{
+  unzFile zip_file = unzOpen(zip_path);
+  if (!zip_file)
+    RETURN_FAILURE("{}: not found", zip_path);
+
+  Common::ScopeGuard zip_guard{[&] { unzClose(zip_file); }};
+
+  std::string out_dir_str(out_dir);
+
+  if (!StringEndsWith(out_dir_str, DIR_SEP))
+    out_dir_str += DIR_SEP;
+
+  if (!File::CreateFullPath(out_dir_str))
+    RETURN_FAILURE("could not create extraction destination path {}", out_dir_str);
+
+  unz_global_info global_info;
+  if (unzGetGlobalInfo(zip_file, &global_info) != UNZ_OK)
+    RETURN_FAILURE("could not read zip archive global info");
+
+  // Buffer to hold a chunk of data read from the
+  // file in the archive that is currently being
+  // extracted
+  constexpr u32 READ_SIZE = 4096;
+  char read_buffer[READ_SIZE];
+
+  // Loop to extract all files
+  for (uLong i = 0; i < global_info.number_entry;)
+  {
+    unz_file_info file_info;
+    char filename_buffer[PATH_MAX];
+    if (unzGetCurrentFileInfo(zip_file, &file_info, filename_buffer, PATH_MAX, nullptr, 0, nullptr,
+                              0) != UNZ_OK)
+      RETURN_FAILURE("could not retrieve a compressed file's information from the zip archive");
+
+    // Is it a directory? (in that case, the file is empty and last character of its name is a
+    // slash, the directory separator)
+    if (file_info.uncompressed_size == 0 &&
+        filename_buffer[std::strlen(filename_buffer) - 1] == '/')
+    {
+      // Entry is a directory, so create it
+      if (!File::CreateDir(out_dir_str + filename_buffer))
+        RETURN_FAILURE("could not create subdirectory {}", filename_buffer);
+    }
+    else
+    {
+      // Entry is a file, so extract it
+      if (unzOpenCurrentFile(zip_file) != UNZ_OK)
+        RETURN_FAILURE("could not open zipped file (compressed file {})", filename_buffer);
+
+      Common::ScopeGuard cur_file_guard{[&] { unzCloseCurrentFile(zip_file); }};
+
+      // Open a file to write out the data
+      File::IOFile out_file(out_dir_str + filename_buffer, "wb");
+      if (!out_file)
+        RETURN_FAILURE("could not open destination file (compressed file {})", filename_buffer);
+
+      int bytes_read;
+      do
+      {
+        bytes_read = unzReadCurrentFile(zip_file, read_buffer, READ_SIZE);
+        if (bytes_read < 0)
+          RETURN_FAILURE("error while reading compressed file {}: {}", filename_buffer, bytes_read);
+
+        if (!out_file.WriteBytes(read_buffer, bytes_read))
+          RETURN_FAILURE("error while writing to destination file (compressed file {})",
+                         filename_buffer);
+
+      } while (bytes_read > 0);
+    }
+
+    // Go the the next entry listed in the zip file
+    if (++i < global_info.number_entry)
+    {
+      if (unzGoToNextFile(zip_file) != UNZ_OK)
+        RETURN_FAILURE("could not switch to next file in zip archive");
+    }
+  }
+
+  return 0;
+}
+#endif  // __EMSCRIPTEN__

@@ -30,7 +30,11 @@
 #if defined(USE_PIPES)
 #define CIFACE_USE_PIPES
 #endif
+#ifdef __EMSCRIPTEN__
+#define CIFACE_USE_HTML5
+#else
 #define CIFACE_USE_DUALSHOCKUDPCLIENT
+#endif
 
 namespace ciface
 {

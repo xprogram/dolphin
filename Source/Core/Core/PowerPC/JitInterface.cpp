@@ -66,6 +66,9 @@ CPUCoreBase* InitJitCore(PowerPC::CPUCore core)
     g_jit = new JitArm64();
     break;
 #endif
+#if _M_WASM
+  case PowerPC::CPUCore::JITWASM:
+#endif
   case PowerPC::CPUCore::CachedInterpreter:
     g_jit = new CachedInterpreter();
     break;

@@ -95,6 +95,8 @@ std::string GetDefaultSoundBackend()
   std::string backend = BACKEND_NULLSOUND;
 #if defined ANDROID
   backend = BACKEND_OPENSLES;
+#elif defined __EMSCRIPTEN__
+  backend = BACKEND_OPENAL;
 #elif defined __linux__
   if (AlsaSound::isValid())
     backend = BACKEND_ALSA;
@@ -114,7 +116,9 @@ std::vector<std::string> GetSoundBackends()
   std::vector<std::string> backends;
 
   backends.emplace_back(BACKEND_NULLSOUND);
+#ifndef __EMSCRIPTEN__
   backends.emplace_back(BACKEND_CUBEB);
+#endif
   if (AlsaSound::isValid())
     backends.emplace_back(BACKEND_ALSA);
   if (PulseAudio::isValid())

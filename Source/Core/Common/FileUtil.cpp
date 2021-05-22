@@ -808,6 +808,11 @@ std::string GetExePath()
         result = TStrToUTF8(*dolphin_exe_path);
       }
     }
+#elif defined(__EMSCRIPTEN__)
+    // Since Emscripten operates as a single-tasking system, there's no need to
+    // have an application executable tied to a file. So, we'll just return
+    // something that looks like it makes sense.
+    result = "/exe";
 #elif defined(__APPLE__)
     result = GetBundleDirectory();
     result = result.substr(0, result.find_last_of("Dolphin.app/Contents/MacOS") + 1);

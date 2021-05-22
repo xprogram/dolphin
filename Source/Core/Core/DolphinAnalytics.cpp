@@ -16,6 +16,8 @@
 #elif defined(ANDROID)
 #include <functional>
 #include "Common/AndroidAnalytics.h"
+#elif defined(__EMSCRIPTEN__)
+#include "Common/WebAdapter.h"
 #endif
 
 #include "Common/Analytics.h"
@@ -275,6 +277,15 @@ void DolphinAnalytics::MakeBaseBuilder()
   builder.AddData("android-manufacturer", s_get_val_func("DEVICE_MANUFACTURER"));
   builder.AddData("android-model", s_get_val_func("DEVICE_MODEL"));
   builder.AddData("android-version", s_get_val_func("DEVICE_OS"));
+#elif defined(__EMSCRIPTEN__)
+  // Yes, we are detailing the compiler, but seeing as
+  // it provides the necessary runtime all by itself, it
+  // doubles as an OS in this case.
+  builder.AddData("os-type", "emscripten");
+  builder.AddData("emscripten-ver-major", __EMSCRIPTEN_major__);
+  builder.AddData("emscripten-ver-minor", __EMSCRIPTEN_minor__);
+  builder.AddData("emscripten-ver-tiny", __EMSCRIPTEN_tiny__);
+  builder.AddData("emscripten-useragent", WebAdapter_GetUserAgent());
 #elif defined(__APPLE__)
   builder.AddData("os-type", "osx");
 

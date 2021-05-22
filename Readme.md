@@ -104,6 +104,41 @@ Or useful for having multiple distinct Dolphin setups for testing/development/TA
 5. `cp -r ../Data/Sys/ Binaries/`
 6. `touch Binaries/portable.txt`
 
+## Building for Emscripten
+
+Thanks to the [Emscripten compiler infrastructure](https://emscripten.org/), there is experimental support for a web port.
+Make sure you [installed and activated the Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html#installation-instructions)
+beforehand, and have CMake on the path. The code requires at least version 2.0.17 of the toolchain. Do be aware that the latest version might
+unexpectedly break the build, as the versioning system is somewhat arbitrary. For best results, use a version close to the minimum stated above.
+
+The build process is very similar to building for other platforms. On Linux or macOS, this will suffice:
+1. `mkdir build`
+2. `cd build`
+3. `emcmake cmake ..`
+4. `make`
+
+On Windows, Make from [MinGW](https://sourceforge.net/projects/mingw-w64/) (`mingw32-make`) must be present on the path, and the
+following must be executed instead of the above:
+1. `mkdir build`
+2. `cd build`
+3. `emcmake cmake .. -G"MinGW Makefiles"`
+4. `mingw32-make`
+
+Any other Make executable can be used (such as [this standalone version](http://www.equation.com/servlet/equation.cmd?fa=make))
+so long as it is specified with `-DCMAKE_MAKE_PROGRAM=<executable>` on the CMake configuration command.
+
+To quickly prototype the application in a browser, enter `emrun <path to application html file>` after
+running one of the set of steps above.
+
+It is *highly* recommended to only use WBFS files for emulation because browsers do not allow
+accessing the computer's filesystem at will. The sandboxed nature of the web
+unfortunately forces us to copy the entire game file content (which is always above 4 GB for
+any ripped ISO without compression) into memory in order to access it; JavaScript, which
+is run inside a 32-bit VM, would never be able to properly access its contents.
+
+The port successfully runs in Chrome, Firefox and the Chromium-based Microsoft Edge. It may not work on other browsers, as they have not been tested.
+It should also be noted that for Firefox, the setting **javascript.options.shared_memory** must be turned on.
+
 ## Building for Android
 
 These instructions assume familiarity with Android development. If you do not have an

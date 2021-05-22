@@ -97,16 +97,16 @@ void GenericLogFmtImpl(LOG_LEVELS level, LOG_TYPE type, const char* file, int li
 static size_t DeterminePathCutOffPoint()
 {
   constexpr const char* pattern = "/source/core/";
-#ifdef _WIN32
+#if defined(_WIN32) || defined(BUILD_HOST_WIN32)
   constexpr const char* pattern2 = "\\source\\core\\";
 #endif
   std::string path = __FILE__;
   std::transform(path.begin(), path.end(), path.begin(),
                  [](char c) { return std::tolower(c, std::locale::classic()); });
-  size_t pos = path.find(pattern);
-#ifdef _WIN32
+  size_t pos = path.rfind(pattern);
+#if defined(_WIN32) || defined(BUILD_HOST_WIN32)
   if (pos == std::string::npos)
-    pos = path.find(pattern2);
+    pos = path.rfind(pattern2);
 #endif
   if (pos != std::string::npos)
     return pos + strlen(pattern);

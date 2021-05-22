@@ -8,5 +8,7 @@
 
 TEST(CommonFuncs, CrashMacro)
 {
+#if GTEST_HAS_DEATH_TEST
   EXPECT_DEATH({ Crash(); }, "");
+#endif
 }

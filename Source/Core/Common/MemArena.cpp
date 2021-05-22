@@ -135,6 +135,10 @@ void MemArena::ReleaseView(void* view, size_t size)
 
 u8* MemArena::FindMemoryBase()
 {
+#ifdef __EMSCRIPTEN__
+  // TODO: revise once there is better mmap support
+  return nullptr;
+#else
 #if _ARCH_32
   const size_t memory_size = 0x31000000;
 #else
@@ -168,6 +172,7 @@ u8* MemArena::FindMemoryBase()
   munmap(base, memory_size);
   return static_cast<u8*>(base);
 #endif
+#endif  // __EMSCRIPTEN__
 }
 
 }  // namespace Common

@@ -232,7 +232,7 @@ void UninstallExceptionHandler()
 {
 }
 
-#elif defined(_POSIX_VERSION) && !defined(_M_GENERIC)
+#elif defined(_POSIX_VERSION) && !defined(_M_GENERIC) && !defined(_M_WASM)
 
 static struct sigaction old_sa_segv;
 static struct sigaction old_sa_bus;

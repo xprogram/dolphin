@@ -17,6 +17,10 @@
 #include <sys/time.h>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #include <fmt/format.h>
 
 #include "Common/CommonTypes.h"
@@ -28,6 +32,8 @@ u32 Timer::GetTimeMs()
 {
 #ifdef _WIN32
   return timeGetTime();
+#elif defined __EMSCRIPTEN__
+  return emscripten_get_now();
 #elif defined __APPLE__
   struct timeval t;
   (void)gettimeofday(&t, nullptr);

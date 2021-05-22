@@ -1,7 +1,6 @@
 add_executable(dolphin-nogui
   Platform.cpp
   Platform.h
-  PlatformHeadless.cpp
   MainNoGUI.cpp
 )
 
@@ -15,6 +14,26 @@ endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   target_sources(dolphin-nogui PRIVATE PlatformFBDev.cpp)
+endif()
+
+if(EMSCRIPTEN)
+  target_sources(dolphin-nogui PRIVATE PlatformWeb.cpp)
+  
+  target_link_libraries(dolphin-nogui PRIVATE
+    lz4sysdir
+
+    # Target only the web environment ("worker" is for pthreads), to eliminate unnecessary support code
+    -sENVIRONMENT=web,worker
+    
+    # Extra flags for proper interop with external wrapping code
+    -sNO_INVOKE_RUN
+    -sEXIT_RUNTIME
+    -sEXPORTED_RUNTIME_METHODS=['FS','callMain']
+
+    -sALLOW_MEMORY_GROWTH
+    -sEXPORT_NAME=DolphinNoGUI)
+else()
+  target_sources(dolphin-nogui PRIVATE PlatformHeadless.cpp)
 endif()
 
 set_target_properties(dolphin-nogui PROPERTIES OUTPUT_NAME dolphin-emu-nogui)

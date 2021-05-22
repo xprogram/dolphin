@@ -9,7 +9,7 @@
 // Call sequence: This file has one of the first function called when a game is booted,
 // the boot sequence in the code is:
 
-// DolphinWX:    FrameTools.cpp         StartGame
+// DolphinQt:    MainWindow.cpp         StartGame
 // Core          BootManager.cpp        BootCore
 //               Core.cpp               Init                     Thread creation
 //                                      EmuThread                Calls CBoot::BootUp

@@ -19,6 +19,9 @@
 #endif
 
 #include "Common/StringUtil.h"
+#ifdef __EMSCRIPTEN__
+#include "Common/WebAdapter.h"
+#endif
 #include "Core/Boot/Boot.h"
 #include "Core/BootManager.h"
 #include "Core/Core.h"
@@ -118,6 +121,9 @@ static std::unique_ptr<Platform> GetPlatform(const optparse::Values& options)
 {
   std::string platform_name = static_cast<const char*>(options.get("platform"));
 
+#ifdef __EMSCRIPTEN__
+  return Platform::CreateWebPlatform(platform_name == "headless");
+#else
 #if HAVE_X11
   if (platform_name == "x11" || platform_name.empty())
     return Platform::CreateX11Platform();
@@ -137,6 +143,7 @@ static std::unique_ptr<Platform> GetPlatform(const optparse::Values& options)
     return Platform::CreateHeadlessPlatform();
 
   return nullptr;
+#endif  // __EMSCRIPTEN__
 }
 
 int main(int argc, char* argv[])
@@ -154,6 +161,10 @@ int main(int argc, char* argv[])
 #if HAVE_X11
             ,
             "x11"
+#endif
+#ifdef __EMSCRIPTEN__
+            ,
+            "web"
 #endif
 #ifdef _WIN32
             ,
@@ -229,11 +240,14 @@ int main(int argc, char* argv[])
       s_platform->Stop();
   });
 
-#ifdef _WIN32
+  // Shut down cleanly on SIGINT and SIGTERM
+#if defined(_WIN32)
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
+#elif defined(__EMSCRIPTEN__)
+  WebAdapter_SetSignalHandler(SIGINT, signal_handler);
+  WebAdapter_SetSignalHandler(SIGTERM, signal_handler);
 #else
-  // Shut down cleanly on SIGINT and SIGTERM
   struct sigaction sa;
   sa.sa_handler = signal_handler;
   sigemptyset(&sa.sa_mask);
@@ -255,6 +269,12 @@ int main(int argc, char* argv[])
 #endif
 
   s_platform->MainLoop();
+#ifdef __EMSCRIPTEN__
+}
+
+int ExitPlatformWebMainLoopCallback()
+{
+#endif
   Core::Stop();
 
   Core::Shutdown();

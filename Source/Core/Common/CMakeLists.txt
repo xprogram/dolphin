@@ -128,6 +128,7 @@ add_library(common
   UPnP.cpp
   UPnP.h
   VariantUtil.h
+  VarInt.h
   Version.cpp
   Version.h
   WindowSystemInfo.h
@@ -181,6 +182,12 @@ if(ANDROID)
     AndroidAnalytics.h
     Logging/ConsoleListenerDroid.cpp
   )
+elseif(EMSCRIPTEN)
+  target_sources(common PRIVATE
+    Logging/ConsoleListenerEmscripten.cpp
+    WebAdapter.h
+  )
+  em_link_js_library_ex(common WebAdapter.js)
 elseif(WIN32)
   target_sources(common PRIVATE
     LdrWatcher.cpp
@@ -201,23 +208,32 @@ if(_M_ARM_64)
     ArmCPUDetect.cpp
     ArmFPURoundMode.cpp
   )
-else()
-  if(_M_X86) #X86
-    target_sources(common PRIVATE
-      x64ABI.cpp
-      x64ABI.h
-      x64Emitter.cpp
-      x64Emitter.h
-      x64FPURoundMode.cpp
-      x64CPUDetect.cpp
-      x64Reg.h
-    )
-  else() # Generic
-    target_sources(common PRIVATE
-      GenericFPURoundMode.cpp
-      GenericCPUDetect.cpp
-    )
+elseif(_M_WASM)
+  target_sources(common PRIVATE
+    GenericFPURoundMode.cpp
+    WasmCPUDetect.cpp
+    #WasmEmitter.cpp
+    #WasmEmitter.h
+    WasmEnv.h
+  )
+  if(EMSCRIPTEN)
+    em_link_js_library_ex(common WasmEnv.js)
   endif()
+elseif(_M_X86) #X86
+  target_sources(common PRIVATE
+    x64ABI.cpp
+    x64ABI.h
+    x64Emitter.cpp
+    x64Emitter.h
+    x64FPURoundMode.cpp
+    x64CPUDetect.cpp
+    x64Reg.h
+  )
+else() # Generic
+  target_sources(common PRIVATE
+    GenericFPURoundMode.cpp
+    GenericCPUDetect.cpp
+  )
 endif()
 
 # OpenGL Interface
@@ -226,9 +242,22 @@ target_sources(common PRIVATE
   GL/GLContext.h
   GL/GLUtil.cpp
   GL/GLUtil.h
-  GL/GLExtensions/GLExtensions.cpp
   GL/GLExtensions/GLExtensions.h
 )
+
+# OpenGL is either a collection of populated GL function
+# pointers or the GL functions linked at build time
+if(EMSCRIPTEN)
+  target_sources(common PRIVATE
+    GL/GLExtensions/GLExtensions_Static.cpp
+    GL/GLExtensions/gl_emscripten.h
+    GL/GLExtensions/gl_emscripten.cpp
+  )
+else()
+  target_sources(common PRIVATE
+    GL/GLExtensions/GLExtensions.cpp
+  )
+endif()
 
 if(ENABLE_EGL AND EGL_FOUND)
   target_sources(common PRIVATE
@@ -266,6 +295,13 @@ elseif(HAIKU)
     GL/GLInterface/BGL.h
     GL/GLInterface/BGL.cpp
   )
+elseif(EMSCRIPTEN)
+  target_sources(common PRIVATE
+    GL/GLInterface/WebGLEmscripten.cpp
+    GL/GLInterface/WebGLEmscripten.h
+  )
+  
+  target_link_libraries(common PUBLIC webgl2gles)
 elseif(ENABLE_X11 AND X11_FOUND)
   target_sources(common PRIVATE
     GL/GLX11Window.cpp
@@ -291,7 +327,7 @@ if(OPROFILE_FOUND)
   target_link_libraries(common PRIVATE OProfile::OProfile)
 endif()
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
   # Posix networking code needs to be fixed for Windows
   add_executable(traversal_server TraversalServer.cpp)
   target_link_libraries(traversal_server PRIVATE common)

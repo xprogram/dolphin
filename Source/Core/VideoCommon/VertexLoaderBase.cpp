@@ -13,6 +13,7 @@
 
 #include <fmt/format.h>
 
+#include "Common/Assert.h"
 #include "Common/CommonTypes.h"
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"

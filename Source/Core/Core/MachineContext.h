@@ -7,7 +7,7 @@
 #include "Common/CommonTypes.h"
 
 // meh.
-#if defined(_M_GENERIC)
+#if defined(_M_GENERIC) || defined(_M_WASM)
 // JitBase uses SContext; it should have no concrete implementations in a
 // generic build.
 struct FakeGenericContext;

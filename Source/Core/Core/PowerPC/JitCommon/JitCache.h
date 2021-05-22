@@ -95,7 +95,7 @@ struct JitBlock : public JitBlockData
 
 typedef void (*CompiledCode)();
 
-// This is essentially just an std::bitset, but Visual Studia 2013's
+// This is essentially just an std::bitset, but Visual Studio 2013's
 // implementation of std::bitset is slow.
 class ValidBlockBitSet final
 {

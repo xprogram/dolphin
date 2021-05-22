@@ -34,6 +34,9 @@
 #ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
 #include "InputCommon/ControllerInterface/DualShockUDPClient/DualShockUDPClient.h"
 #endif
+#ifdef CIFACE_USE_HTML5
+#include "InputCommon/ControllerInterface/HTML5/HTML5.h"
+#endif
 
 ControllerInterface g_controller_interface;
 
@@ -76,6 +79,9 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 #endif
 #ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
   ciface::DualShockUDPClient::Init();
+#endif
+#ifdef CIFACE_USE_HTML5
+  ciface::HTML5::Init();
 #endif
 
   RefreshDevices();
@@ -134,6 +140,9 @@ void ControllerInterface::RefreshDevices()
 #endif
 #ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
   ciface::DualShockUDPClient::PopulateDevices();
+#endif
+#ifdef CIFACE_USE_HTML5
+  ciface::HTML5::PopulateDevices(m_wsi.render_surface);
 #endif
 
   WiimoteReal::ProcessWiimotePool();
@@ -202,6 +211,9 @@ void ControllerInterface::Shutdown()
 #endif
 #ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
   ciface::DualShockUDPClient::DeInit();
+#endif
+#ifdef CIFACE_USE_HTML5
+  ciface::HTML5::DeInit();
 #endif
 }
 

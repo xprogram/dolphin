@@ -1,6 +1,7 @@
 add_library(inputcommon
   DynamicInputTextureManager.cpp
   DynamicInputTextureManager.h
+  GCAdapter.h
   ImageOperations.cpp
   ImageOperations.h
   InputConfig.cpp
@@ -118,6 +119,17 @@ elseif(APPLE)
     ${FORCEFEEDBACK_LIBRARY}
     ${IOK_LIBRARY}
   )
+elseif(EMSCRIPTEN)
+  target_sources(inputcommon PRIVATE
+    ControllerInterface/HTML5/HTML5.h
+    ControllerInterface/HTML5/HTML5.cpp
+    ControllerInterface/HTML5/HTML5Gamepad.h
+    ControllerInterface/HTML5/HTML5Gamepad.cpp
+    ControllerInterface/HTML5/HTML5KeyboardMouse.h
+    ControllerInterface/HTML5/HTML5KeyboardMouse.cpp
+    ControllerInterface/HTML5/HTML5NativeInput.h
+  )
+  em_link_js_library_ex(inputcommon ControllerInterface/HTML5/HTML5NativeInput.js)
 elseif(X11_FOUND)
   target_sources(inputcommon PRIVATE
     ControllerInterface/Xlib/XInput2.cpp
@@ -141,11 +153,10 @@ endif()
 
 if(ANDROID)
   target_sources(inputcommon PRIVATE GCAdapter_Android.cpp)
+elseif(EMSCRIPTEN)
+  target_sources(inputcommon PRIVATE GCAdapter_Null.cpp)
 else()
-  target_sources(inputcommon PRIVATE
-    GCAdapter.cpp
-    GCAdapter.h
-  )
+  target_sources(inputcommon PRIVATE GCAdapter.cpp)
   target_link_libraries(inputcommon PUBLIC ${LIBUSB_LIBRARIES})
 endif()
 

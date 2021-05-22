@@ -85,7 +85,13 @@ void VideoBackend::InitBackendInfo()
   g_Config.backend_info.bSupports3DVision = false;
   g_Config.backend_info.bSupportsPostProcessing = true;
   g_Config.backend_info.bSupportsSSAA = true;
+#ifdef __EMSCRIPTEN__
+  // glDepthRange in WebGL (which is what the emulated glDepthRange
+  // in Emscripten calls) does not support zNear > zFar
+  g_Config.backend_info.bSupportsReversedDepthRange = false;
+#else
   g_Config.backend_info.bSupportsReversedDepthRange = true;
+#endif
   g_Config.backend_info.bSupportsLogicOp = true;
   g_Config.backend_info.bSupportsMultithreading = false;
   g_Config.backend_info.bSupportsCopyToVram = true;
@@ -98,8 +104,13 @@ void VideoBackend::InitBackendInfo()
   // TODO: There is a bug here, if texel buffers or SSBOs/atomics are not supported the graphics
   // options will show the option when it is not supported. The only way around this would be
   // creating a context when calling this function to determine what is available.
+#ifdef __EMSCRIPTEN__
+  g_Config.backend_info.bSupportsGPUTextureDecoding = false;
+  g_Config.backend_info.bSupportsBBox = false;
+#else
   g_Config.backend_info.bSupportsGPUTextureDecoding = true;
   g_Config.backend_info.bSupportsBBox = true;
+#endif
 
   // Overwritten in Render.cpp later
   g_Config.backend_info.bSupportsDualSourceBlend = true;

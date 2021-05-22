@@ -191,7 +191,6 @@ add_library(core
   HW/EXI/EXI_DeviceIPL.h
   HW/EXI/EXI_DeviceMemoryCard.cpp
   HW/EXI/EXI_DeviceMemoryCard.h
-  HW/EXI/EXI_DeviceMic.cpp
   HW/EXI/EXI_DeviceMic.h
   HW/EXI/EXI.cpp
   HW/EXI/EXI.h
@@ -478,6 +477,10 @@ add_library(core
   WiiUtils.h
 )
 
+if(NOT EMSCRIPTEN)
+  target_sources(core PRIVATE HW/EXI/EXI_DeviceMic.cpp)
+endif()
+
 if(_M_X86)
   target_sources(core PRIVATE
     DSP/Jit/x64/DSPEmitter.cpp
@@ -559,7 +562,6 @@ target_link_libraries(core
 PUBLIC
   audiocommon
   common
-  cubeb
   discio
   enet
   inputcommon
@@ -577,6 +579,10 @@ PRIVATE
   ${LZO}
   ZLIB::ZLIB
 )
+
+if(NOT EMSCRIPTEN)
+  target_link_libraries(core PUBLIC cubeb)
+endif()
 
 if ((DEFINED CMAKE_ANDROID_ARCH_ABI AND CMAKE_ANDROID_ARCH_ABI MATCHES "x86|x86_64") OR
     (NOT DEFINED CMAKE_ANDROID_ARCH_ABI AND _M_X86))
@@ -638,10 +644,10 @@ elseif(APPLE)
   )
   target_link_libraries(core PUBLIC ${IOB_LIBRARY})
 elseif(UNIX)
-  target_sources(core PRIVATE
-    HW/EXI/BBA/TAP_Unix.cpp
-    HW/EXI/BBA/XLINK_KAI_BBA.cpp
-  )
+  target_sources(core PRIVATE HW/EXI/BBA/TAP_Unix.cpp)
+  if(NOT EMSCRIPTEN)
+    target_sources(core PRIVATE HW/EXI/BBA/XLINK_KAI_BBA.cpp)
+  endif()
   if(ANDROID)
     target_sources(core PRIVATE
       HW/WiimoteReal/IOAndroid.cpp
@@ -687,7 +693,7 @@ if(GDBSTUB)
   )
 endif()
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
   target_sources(core PRIVATE
     MemoryWatcher.cpp
     MemoryWatcher.h
