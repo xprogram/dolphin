@@ -140,6 +140,8 @@ public:
   void fcmpX(UGeckoInstruction inst);
   void frspx(UGeckoInstruction inst);
   void fctiwzx(UGeckoInstruction inst);
+  void fresx(UGeckoInstruction inst);
+  void frsqrtex(UGeckoInstruction inst);
 
   // Paired
   void ps_maddXX(UGeckoInstruction inst);
@@ -147,6 +149,8 @@ public:
   void ps_mulsX(UGeckoInstruction inst);
   void ps_sel(UGeckoInstruction inst);
   void ps_sumX(UGeckoInstruction inst);
+  void ps_res(UGeckoInstruction inst);
+  void ps_rsqrte(UGeckoInstruction inst);
 
   // Loadstore paired
   void psq_l(UGeckoInstruction inst);
@@ -232,6 +236,8 @@ protected:
   // AsmRoutines
   void GenerateAsm();
   void GenerateCommonAsm();
+  void GenerateFres();
+  void GenerateFrsqrte();
   void GenerateConvertDoubleToSingle();
   void GenerateConvertSingleToDouble();
   void GenerateFPRF(bool single);
@@ -264,6 +270,8 @@ protected:
                bool Rc = false);
 
   void SetFPRFIfNeeded(bool single, Arm64Gen::ARM64Reg reg);
+  void Force25BitPrecision(Arm64Gen::ARM64Reg output, Arm64Gen::ARM64Reg input,
+                           Arm64Gen::ARM64Reg temp);
 
   // <Fastmem fault location, slowmem handler location>
   std::map<const u8*, FastmemArea> m_fault_to_handler;
